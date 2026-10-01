@@ -5,7 +5,15 @@ require_once __DIR__ . '/../config/database.php';
 $db = db();
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $result = $db->query('SELECT id, username, phone, email, role, entity, created_at FROM users ORDER BY id');
+    if (isset($_GET['entity']) && $_GET['entity'] !== '') {
+        $entity = trim($_GET['entity']);
+        $stmt = $db->prepare("SELECT id, username, display_name, phone, email, role, entity, created_at FROM users WHERE LOWER(entity) LIKE CONCAT(LOWER(?), '%') ORDER BY id");
+        $stmt->bind_param('s', $entity);
+        $stmt->execute();
+        $result = $stmt->get_result();
+    } else {
+        $result = $db->query('SELECT id, username, display_name, phone, email, role, entity, created_at FROM users ORDER BY id');
+    }
     $users = [];
     while ($row = $result->fetch_assoc()) {
         $users[] = $row;
