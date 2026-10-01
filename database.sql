@@ -135,16 +135,39 @@ CREATE TABLE IF NOT EXISTS `procurements` (
   `completion_date`     DATE         DEFAULT NULL,
   `current_stage_index` INT UNSIGNED NOT NULL DEFAULT 0,
   `created_by`          INT UNSIGNED DEFAULT NULL,
+  `agent_id`            INT UNSIGNED DEFAULT NULL,
   `created_at`          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_ref_no` (`ref_no`),
   KEY `fk_proc_type`   (`procurement_type_id`),
   KEY `fk_proc_method` (`procurement_method_id`),
   KEY `fk_proc_user`   (`created_by`),
+  KEY `fk_proc_agent`  (`agent_id`),
   CONSTRAINT `fk_proc_type`   FOREIGN KEY (`procurement_type_id`)   REFERENCES `procurement_types` (`id`),
   CONSTRAINT `fk_proc_method` FOREIGN KEY (`procurement_method_id`) REFERENCES `procurement_methods` (`id`),
-  CONSTRAINT `fk_proc_user`   FOREIGN KEY (`created_by`)            REFERENCES `users` (`id`) ON DELETE SET NULL
+  CONSTRAINT `fk_proc_user`   FOREIGN KEY (`created_by`)            REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_proc_agent`  FOREIGN KEY (`agent_id`)              REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @ddl := IF(
+  (SELECT COUNT(*) FROM `information_schema`.`COLUMNS`
+    WHERE `TABLE_SCHEMA` = @pdu_schema
+      AND `TABLE_NAME` = 'procurements'
+      AND `COLUMN_NAME` = 'agent_id') = 0,
+  'ALTER TABLE `procurements` ADD COLUMN `agent_id` INT UNSIGNED DEFAULT NULL AFTER `created_by`',
+  'SELECT 1'
+);
+PREPARE ddl FROM @ddl; EXECUTE ddl; DEALLOCATE PREPARE ddl;
+
+SET @ddl := IF(
+  (SELECT COUNT(*) FROM `information_schema`.`REFERENTIAL_CONSTRAINTS`
+    WHERE `CONSTRAINT_SCHEMA` = @pdu_schema
+      AND `TABLE_NAME` = 'procurements'
+      AND `CONSTRAINT_NAME` = 'fk_proc_agent') = 0,
+  'ALTER TABLE `procurements` ADD KEY `fk_proc_agent` (`agent_id`), ADD CONSTRAINT `fk_proc_agent` FOREIGN KEY (`agent_id`) REFERENCES `users` (`id`) ON DELETE SET NULL',
+  'SELECT 1'
+);
+PREPARE ddl FROM @ddl; EXECUTE ddl; DEALLOCATE PREPARE ddl;
 
 -- -------------------------------------------
 -- 4. PROCUREMENT STAGES

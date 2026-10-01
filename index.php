@@ -76,15 +76,15 @@
           <div class="text-center mb-4">
             <i class="bi bi-shield-lock-fill text-PDU display-4"></i>
             <h4 class="fw-bold text-PDU mt-2">Portal Access</h4>
-            <p class="text-muted small">Sign in using Phone Number & Password</p>
+            <p class="text-muted small">Sign in using Email & Password</p>
           </div>
           
           <div id="loginAlert" class="alert alert-danger d-none small"></div>
 
           <form onsubmit="handleLogin(event)">
             <div class="mb-3">
-              <label class="form-label font-weight-bold">Phone Number</label>
-              <input type="text" class="form-control" id="loginPhone" name="phone" required>
+              <label class="form-label font-weight-bold" for="loginEmail">Email Address</label>
+              <input type="email" class="form-control" id="loginEmail" name="email" autocomplete="username" required>
             </div>
             <div class="mb-4">
               <label class="form-label">Password</label>
@@ -172,8 +172,12 @@
 
         <!-- Master Table -->
         <div class="card border-0 shadow-sm">
-          <div class="card-header bg-white py-3">
+          <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center gap-3">
             <h5 class="fw-bold mb-0">Master Procurement Records</h5>
+            <div class="input-group input-group-sm" style="max-width: 360px;">
+              <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+              <input type="search" class="form-control" id="procurementSearch" aria-label="Search procurement records" placeholder="Ref no., type, method, or initiator" oninput="renderDashboard()">
+            </div>
           </div>
           <div class="card-body p-0">
             <div class="table-responsive">
@@ -186,10 +190,10 @@
                     <th>Method</th>
                     <th>Initiation Date</th>
                     <th>BEB Notice Date</th>
-                    <th>Projected Completion</th>
                     <th>Current Delay</th>
                     <th>Current Status</th>
                     <th>Initiated By</th>
+                    <th>Assigned To</th>
                     <th class="text-end">Actions</th>
                   </tr>
                 </thead>
@@ -385,7 +389,7 @@
               <input type="text" class="form-control form-control-sm" id="newDisplayName" maxlength="50" required>
             </div>
             <div class="col-md-3">
-              <label class="form-label small fw-bold">Phone Number (Username)</label>
+              <label class="form-label small fw-bold">Phone Number</label>
               <input type="tel" class="form-control form-control-sm" id="newPhone" placeholder="+256..." required>
             </div>
             <div class="col-md-3">
@@ -428,6 +432,7 @@
                   <th>Email</th>
                   <th>Entity</th>
                   <th>Role</th>
+                  <th class="text-end">Actions</th>
                 </tr>
               </thead>
               <tbody id="userListTableBody">
@@ -436,6 +441,61 @@
             </table>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT SYSTEM USER -->
+  <div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-PDU text-white">
+          <h5 class="modal-title fw-bold">Edit System User</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form onsubmit="saveUserEdit(event)">
+          <input type="hidden" id="editUserId">
+          <div class="modal-body">
+            <div class="alert alert-danger d-none" id="editUserAlert" role="alert"></div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-bold" for="editUserDisplayName">Full Name</label>
+                <input type="text" class="form-control" id="editUserDisplayName" maxlength="50" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-bold" for="editUserPhone">Phone Number</label>
+                <input type="tel" class="form-control" id="editUserPhone" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-bold" for="editUserEmail">Email</label>
+                <input type="email" class="form-control" id="editUserEmail">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-bold" for="editUserEntity">Entity</label>
+                <select class="form-select" id="editUserEntity" required>
+                  <option value="Depoint">Depoint</option>
+                  <option value="PDU">PDU</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-bold" for="editUserRole">Role</label>
+                <select class="form-select" id="editUserRole" required>
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-bold" for="editUserPassword">New Password</label>
+                <input type="password" class="form-control" id="editUserPassword" autocomplete="new-password">
+                <div class="form-text">Leave blank to keep the current password.</div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary bg-PDU">Save User</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -1107,22 +1167,75 @@
           <td>${u.email || '-'}</td>
           <td>${u.entity}</td>
           <td>${u.role === 'admin' ? '<span class="badge bg-danger">Admin</span>' : '<span class="badge bg-primary">User</span>'}</td>
+          <td class="text-end"><button type="button" class="btn btn-sm btn-outline-primary" onclick="openEditUserModal(${u.id})" aria-label="Edit ${u.display_name || u.username}"><i class="bi bi-pencil-square"></i> Edit</button></td>
         `;
         tbody.appendChild(tr);
       });
     }
 
+    function openEditUserModal(userId) {
+      const user = systemUsers.find(item => Number(item.id) === Number(userId));
+      if (!user || currentUser.role !== 'admin') return;
+
+      document.getElementById('editUserId').value = user.id;
+      document.getElementById('editUserDisplayName').value = user.display_name || (user.username !== user.phone ? user.username : '');
+      document.getElementById('editUserPhone').value = user.phone;
+      document.getElementById('editUserEmail').value = user.email || '';
+      document.getElementById('editUserEntity').value = user.entity;
+      document.getElementById('editUserRole').value = user.role;
+      document.getElementById('editUserPassword').value = '';
+      document.getElementById('editUserAlert').classList.add('d-none');
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('editUserModal')).show();
+    }
+
+    async function saveUserEdit(e) {
+      e.preventDefault();
+      const alertBox = document.getElementById('editUserAlert');
+      alertBox.classList.add('d-none');
+      const id = Number(document.getElementById('editUserId').value);
+
+      try {
+        const result = await apiPut('users.php', {
+          id,
+          display_name: document.getElementById('editUserDisplayName').value.trim(),
+          phone: document.getElementById('editUserPhone').value.trim(),
+          email: document.getElementById('editUserEmail').value.trim(),
+          entity: document.getElementById('editUserEntity').value,
+          role: document.getElementById('editUserRole').value,
+          password: document.getElementById('editUserPassword').value
+        });
+        if (!result.success) throw new Error(result.error || 'Could not update user account.');
+
+        await loadUsers();
+        renderUserTable();
+        const updatedUser = systemUsers.find(user => Number(user.id) === id);
+        if (updatedUser && Number(currentUser.id) === id) {
+          currentUser = Object.assign({}, currentUser, updatedUser);
+          localStorage.setItem('currentUser', JSON.stringify(currentUser));
+          document.getElementById('userInfo').textContent = (currentUser.display_name || currentUser.username) + ' (' + currentUser.phone + ')';
+          document.getElementById('userRoleBadge').textContent = currentUser.role === 'admin' ? 'Admin User' : 'User';
+          document.getElementById('userRoleBadge').className = 'badge ms-2 ' + (currentUser.role === 'admin' ? 'bg-danger' : 'bg-primary');
+          document.getElementById('newProcurementBtn').classList.toggle('d-none', currentUser.role !== 'admin');
+          document.getElementById('manageUsersBtn').classList.toggle('d-none', currentUser.role !== 'admin');
+        }
+        bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide();
+      } catch (error) {
+        alertBox.textContent = error.message || 'Could not update user account. Please try again.';
+        alertBox.classList.remove('d-none');
+      }
+    }
+
     // --- AUTHENTICATION ---
     async function handleLogin(e) {
       e.preventDefault();
-      const phoneInput = document.getElementById('loginPhone').value.trim();
+      const emailInput = document.getElementById('loginEmail').value.trim();
       const passInput = document.getElementById('loginPassword').value.trim();
       const alertBox = document.getElementById('loginAlert');
 
-      const result = await apiPost('login.php', { phone: phoneInput, password: passInput });
+      const result = await apiPost('login.php', { email: emailInput, password: passInput });
 
       if (!result.success) {
-        alertBox.textContent = result.error || 'Invalid Phone Number or Password!';
+        alertBox.textContent = result.error || 'Invalid Email Address or Password!';
         alertBox.classList.remove('d-none');
         return;
       }
@@ -1439,6 +1552,11 @@
         else if (isDelayed) delayed++;
         else active++;
 
+        const query = document.getElementById('procurementSearch').value.trim().toLowerCase();
+        const matchesSearch = [p.ref_no, p.type, p.method, p.initiator_name]
+          .some(value => String(value || '').toLowerCase().includes(query));
+        if (!matchesSearch) return;
+
         let statusBadge = isCompleted
           ? '<span class="badge bg-success">Completed</span>'
           : (isDelayed ? '<span class="badge bg-danger">Delayed</span>' : '<span class="badge bg-warning text-dark">On Track</span>');
@@ -1456,10 +1574,10 @@
           <td><span class="badge bg-light text-dark border">${p.method}</span></td>
           <td>${p.start_date}</td>
           <td class="text-primary fw-semibold">${p.beb_date}</td>
-          <td>${p.completion_date}</td>
           <td>${delayBadge}</td>
           <td>${statusBadge}</td>
           <td>${p.initiator_name || 'Unknown'}</td>
+          <td>${p.assigned_to || 'Unknown'}</td>
           <td class="text-end">
             ${!isCompleted && canManage ? '<button class="btn btn-sm btn-outline-warning me-1" onclick="openEditModal(\'' + p.id + '\')"><i class="bi bi-pencil-square"></i> Edit</button>' : ''}
             <button class="btn btn-sm btn-outline-primary" onclick="openStageModal('${p.id}')">

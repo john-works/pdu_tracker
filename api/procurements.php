@@ -49,10 +49,17 @@ function procurementSnapshot(mysqli $db, int $procurementId): ?array
 {
     $stmt = $db->prepare(
         'SELECT p.id, p.ref_no, p.entity, p.title, p.start_date, p.beb_date, p.completion_date,
-                p.current_stage_index, p.created_by, t.name AS type, t.code AS type_code, m.code AS method
+            p.current_stage_index, p.created_by, p.agent_id, t.name AS type, t.code AS type_code, m.code AS method,
+            CASE
+                WHEN NULLIF(agent_user.display_name, \'\') IS NOT NULL THEN agent_user.display_name
+                WHEN agent_user.username IS NOT NULL AND agent_user.username <> agent_user.phone THEN agent_user.username
+                WHEN agent_user.id IS NOT NULL THEN \'Name not set\'
+                ELSE NULL
+            END AS assigned_to
            FROM procurements p
            LEFT JOIN procurement_types   t ON t.id = p.procurement_type_id
            LEFT JOIN procurement_methods m ON m.id = p.procurement_method_id
+           LEFT JOIN users agent_user ON agent_user.id = p.agent_id
           WHERE p.id = ?'
     );
     $stmt->bind_param('i', $procurementId);
@@ -220,11 +227,18 @@ if ($method === 'GET') {
     }
 
     $result = $db->query(
-        'SELECT p.*, u.username AS initiator_name, t.name AS type, t.code AS type_code, m.code AS method
+        'SELECT p.*, u.username AS initiator_name, t.name AS type, t.code AS type_code, m.code AS method,
+                CASE
+                    WHEN NULLIF(agent_user.display_name, \'\') IS NOT NULL THEN agent_user.display_name
+                    WHEN agent_user.username IS NOT NULL AND agent_user.username <> agent_user.phone THEN agent_user.username
+                    WHEN agent_user.id IS NOT NULL THEN \'Name not set\'
+                    ELSE NULL
+                END AS assigned_to
            FROM procurements p
            LEFT JOIN users u ON p.created_by = u.id
            LEFT JOIN procurement_types   t ON t.id = p.procurement_type_id
            LEFT JOIN procurement_methods m ON m.id = p.procurement_method_id
+           LEFT JOIN users agent_user ON agent_user.id = p.agent_id
           ORDER BY p.id DESC'
     );
     $procs = [];
@@ -282,14 +296,14 @@ if ($method === 'POST') {
         exit;
     }
 
-    $stmt = $db->prepare('INSERT INTO procurements (ref_no, procurement_type_id, entity, title, procurement_method_id, start_date, beb_date, completion_date, current_stage_index, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)');
+    $stmt = $db->prepare('INSERT INTO procurements (ref_no, procurement_type_id, entity, title, procurement_method_id, start_date, beb_date, completion_date, current_stage_index, created_by, agent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)');
     $title = (string) ($input['title'] ?? '');
     $startDate = (string) ($input['start_date'] ?? '');
     $bebDate = (string) ($input['beb_date'] ?? '');
     $completionDate = (string) ($input['completion_date'] ?? '');
-    $stmt->bind_param('sississsi',
+    $stmt->bind_param('sississsii',
         $refNo, $typeId, $entity, $title,
-        $methodId, $startDate, $bebDate, $completionDate, $createdBy
+        $methodId, $startDate, $bebDate, $completionDate, $createdBy, $agentId
     );
 
     try {
