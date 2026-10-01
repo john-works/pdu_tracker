@@ -849,7 +849,12 @@
         body: JSON.stringify(data)
       });
       if (res.status === 401 && endpoint !== 'login.php') expireSession();
-      return res.json();
+      const responseText = await res.text();
+      try {
+        return JSON.parse(responseText);
+      } catch (error) {
+        throw new Error('The server returned an invalid response (HTTP ' + res.status + '). Ask the server administrator to check the PHP and database logs.');
+      }
     }
 
     async function apiPut(endpoint, data) {
@@ -1232,7 +1237,14 @@
       const passInput = document.getElementById('loginPassword').value.trim();
       const alertBox = document.getElementById('loginAlert');
 
-      const result = await apiPost('login.php', { email: emailInput, password: passInput });
+      let result;
+      try {
+        result = await apiPost('login.php', { email: emailInput, password: passInput });
+      } catch (error) {
+        alertBox.textContent = error.message || 'The sign-in service is temporarily unavailable.';
+        alertBox.classList.remove('d-none');
+        return;
+      }
 
       if (!result.success) {
         alertBox.textContent = result.error || 'Invalid Email Address or Password!';
