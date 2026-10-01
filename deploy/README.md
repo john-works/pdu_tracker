@@ -2,7 +2,17 @@
 
 The dashboard checks reminders while it is open. For reminders to run while nobody is using the site, install the cron job on the Linux host.
 
-Before installing, configure `config/database.php` with the production database credentials and configure the Linux PHP CLI mail transport. `config/email.php` sets the sender address; it does not configure the SMTP relay.
+Before deployment, set these environment variables for the web PHP process and the cron PHP process:
+
+```text
+PDU_DB_HOST=database-hostname
+PDU_DB_PORT=3306
+PDU_DB_NAME=pdu
+PDU_DB_USER=application-user
+PDU_DB_PASS=application-password
+```
+
+Use the credentials for the production database; do not use WAMP's local `root` defaults. Configure the Linux PHP mail transport as well. `config/email.php` sets the sender address; it does not configure the SMTP relay.
 
 Run the installer as the account that should own the job and can access the application, database, and mail transport:
 
