@@ -208,23 +208,70 @@ INSERT INTO `procurement_methods` (`code`, `name`, `sort_order`) VALUES
   ('EOI_INT', 'Expression of Interest (International)', 10)
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `sort_order` = VALUES(`sort_order`);
 
--- 7-stage catalogue. The draft contract is anchored to the Contracts Committee
--- decision date, and the BEB / completion roles replace the hardcoded JS indices.
+-- 7-stage catalogue. Both the draft contract and BEB display periods are
+-- anchored to the Contracts Committee decision date.
 -- Only the two accountable bodies are used: PDU runs the process and Depoint is
 -- the procuring entity that drafts, issues and receives the bid.
+-- Free both final catalogue orders before swapping them under the unique key.
+UPDATE `process_stages` SET `stage_order` = 254 WHERE `code` = 'BEB_DISPLAY';
+UPDATE `process_stages` SET `stage_order` = 255 WHERE `code` = 'DRAFT_CONTRACT';
+
 INSERT INTO `process_stages` (`code`, `name`, `stage_order`, `default_responsible_party`, `anchors_from_code`, `date_role`) VALUES
   ('BID_DRAFT',      'Bid Draft Preparation',                  0, 'Depoint',    NULL,             NULL),
   ('BID_ISSUANCE',   'Issuance of the Bid',                     1, 'Depoint',    NULL,             NULL),
   ('BIDDING',        'Bidding / Proposal Submission Period',    2, 'Depoint',    NULL,             NULL),
   ('EVALUATION',     'Evaluation Period',                       3, 'PDU',        NULL,             NULL),
   ('CC_DECISION',    'Contracts Committee Decision',            4, 'PDU',        NULL,             NULL),
-  ('BEB_DISPLAY',    'BEB Display Window',                      5, 'PDU',        NULL,             'BEB'),
-  ('DRAFT_CONTRACT', 'Submission of Draft Contract & Completion', 6, 'PDU',   'CC_DECISION',    'COMPLETION')
+  ('DRAFT_CONTRACT', 'Submission of Draft Contract & Completion', 5, 'PDU',   'CC_DECISION',    'COMPLETION'),
+  ('BEB_DISPLAY',    'BEB Display Window',                      6, 'PDU',   'CC_DECISION',    'BEB')
 ON DUPLICATE KEY UPDATE
   `name` = VALUES(`name`),
+  `stage_order` = VALUES(`stage_order`),
   `default_responsible_party` = VALUES(`default_responsible_party`),
   `anchors_from_code` = VALUES(`anchors_from_code`),
   `date_role` = VALUES(`date_role`);
+
+-- Migrate records saved with BEB before Draft Contract. Keep the active stage
+-- pointed at the same stage code while swapping its stored display order.
+DROP TEMPORARY TABLE IF EXISTS `tmp_procurement_stage_order`;
+CREATE TEMPORARY TABLE `tmp_procurement_stage_order` AS
+SELECT b.`procurement_id`, b.`stage_order` AS `beb_old_order`,
+       d.`stage_order` AS `draft_old_order`,
+       CASE
+         WHEN p.`current_stage_index` = b.`stage_order` THEN d.`stage_order`
+         WHEN p.`current_stage_index` = d.`stage_order` THEN b.`stage_order`
+         ELSE p.`current_stage_index`
+       END AS `new_current_stage_index`
+FROM `procurement_stages` b
+JOIN `process_stages` bc ON bc.`id` = b.`process_stage_id` AND bc.`code` = 'BEB_DISPLAY'
+JOIN `procurement_stages` d ON d.`procurement_id` = b.`procurement_id`
+JOIN `process_stages` dc ON dc.`id` = d.`process_stage_id` AND dc.`code` = 'DRAFT_CONTRACT'
+JOIN `procurements` p ON p.`id` = b.`procurement_id`
+WHERE b.`stage_order` < d.`stage_order`;
+
+UPDATE `procurements` p
+JOIN `tmp_procurement_stage_order` x ON x.`procurement_id` = p.`id`
+SET p.`current_stage_index` = x.`new_current_stage_index`;
+
+UPDATE `procurement_stages` s
+JOIN `process_stages` c ON c.`id` = s.`process_stage_id`
+JOIN `tmp_procurement_stage_order` x ON x.`procurement_id` = s.`procurement_id`
+SET s.`stage_order` = s.`stage_order` + 100
+WHERE c.`code` IN ('BEB_DISPLAY', 'DRAFT_CONTRACT');
+
+UPDATE `procurement_stages` s
+JOIN `process_stages` c ON c.`id` = s.`process_stage_id`
+JOIN `tmp_procurement_stage_order` x ON x.`procurement_id` = s.`procurement_id`
+SET s.`stage_order` = x.`draft_old_order`
+WHERE c.`code` = 'BEB_DISPLAY';
+
+UPDATE `procurement_stages` s
+JOIN `process_stages` c ON c.`id` = s.`process_stage_id`
+JOIN `tmp_procurement_stage_order` x ON x.`procurement_id` = s.`procurement_id`
+SET s.`stage_order` = x.`beb_old_order`
+WHERE c.`code` = 'DRAFT_CONTRACT';
+
+DROP TEMPORARY TABLE `tmp_procurement_stage_order`;
 
 -- Only the two accountable bodies. Stages and procurements that referenced the
 -- earlier committee names are repointed onto these by the cleanup section below.
