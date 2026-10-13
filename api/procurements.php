@@ -414,10 +414,6 @@ if ($method === 'PUT') {
         if ($stageCount > 0 && $newStage >= $stageCount - 1) {
             $p = $db->query('SELECT ref_no, title, entity, completion_date FROM procurements WHERE id = ' . $id);
             if ($p && $info = $p->fetch_assoc()) {
-                $emailConfig = require __DIR__ . '/../config/email.php';
-                $fromName = str_replace(["\r", "\n"], '', $emailConfig['from_name'] ?? '');
-                $fromAddress = trim($emailConfig['from_address'] ?? '');
-                $replyTo = trim($emailConfig['reply_to'] ?? $fromAddress);
                 $to = 'jssekamatte@PDU.go.ug';
                 $subject = 'Procurement Successfully Completed - ' . $info['ref_no'];
                 $body = "Dear User,\n\n"
@@ -427,12 +423,8 @@ if ($method === 'PUT') {
                       . "Entity: " . $info['entity'] . "\n"
                       . "Completion Date: " . ($info['completion_date'] ?: date('Y-m-d')) . "\n\n"
                       . "Thank you.\n";
-                if ($fromName !== '' && filter_var($fromAddress, FILTER_VALIDATE_EMAIL) && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
-                    $headers = 'From: ' . $fromName . ' <' . $fromAddress . ">\r\n"
-                             . 'Reply-To: ' . $replyTo . "\r\n"
-                             . "Content-Type: text/plain; charset=utf-8\r\n";
-                    @mail($to, $subject, $body, $headers);
-                }
+                require_once __DIR__ . '/../config/smtp_mailer.php';
+                pduSendMail($to, $subject, $body);
             }
         }
 

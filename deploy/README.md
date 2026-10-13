@@ -10,9 +10,10 @@ PDU_DB_PORT=3306
 PDU_DB_NAME=pdu
 PDU_DB_USER=application-user
 PDU_DB_PASS=application-password
+PDU_SMTP_PASS=smtp-mailbox-password
 ```
 
-Use the credentials for the production database; do not use WAMP's local `root` defaults. Configure the Linux PHP mail transport as well. `config/email.php` sets the sender address; it does not configure the SMTP relay.
+Use the credentials for the production database; do not use WAMP's local `root` defaults. Emails are sent over authenticated SMTP to `mail.ppda.go.ug` as `no-reply@ppda.go.ug` (`config/email.php`), so the mailbox password must be in `PDU_SMTP_PASS` for the web PHP process and the cron PHP process.
 
 Run the installer as the account that should own the job and can access the application, database, and mail transport:
 

@@ -299,7 +299,7 @@
 
               <div class="col-md-2">
                 <label class="form-label fw-bold">Initiation Date</label>
-                <input type="date" class="form-control" id="pStartDate" readonly  onchange="calculateCustomTimeline()" required>
+                <input type="date" class="form-control" id="pStartDate"   onchange="calculateCustomTimeline()" required>
               </div>
               
               <div class="col-md-4">

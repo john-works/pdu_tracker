@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/smtp_mailer.php';
+
 function isReminderWorkingDay(DateTimeImmutable $date, array $publicHolidays): bool
 {
     return (int) $date->format('N') < 6 && !in_array($date->format('m-d'), $publicHolidays, true);
@@ -112,16 +114,15 @@ function runDeadlineReminders(mysqli $db, bool $dryRun = false): array
                 continue;
             }
 
-            $headers = 'From: ' . $fromName . ' <' . $fromAddress . ">\r\n"
-                     . 'Reply-To: ' . $replyTo . "\r\n"
-                     . "Content-Type: text/plain; charset=utf-8\r\n";
-            if (@mail($recipient['email'], $subject, $body, $headers)) {
-                $recordSent->bind_param('isi', $stageId, $dateValue, $userId);
-                $recordSent->execute();
-                $stats['sent']++;
-            } else {
-                error_log('Deadline reminder email failed for ' . $recipient['email'] . ' (' . $stage['ref_no'] . ')');
-                $stats['failed']++;
+            if (!$dryRun) {
+                if (pduSendMail($recipient['email'], $subject, $body)) {
+                    $recordSent->bind_param('isi', $stageId, $dateValue, $userId);
+                    $recordSent->execute();
+                    $stats['sent']++;
+                } else {
+                    error_log('Deadline reminder email failed for ' . $recipient['email'] . ' (' . $stage['ref_no'] . ')');
+                    $stats['failed']++;
+                }
             }
         }
     }
