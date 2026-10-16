@@ -54,7 +54,10 @@ function pduSendMail(string $to, string $subject, string $body, array $additiona
     }
 
     $timeout = 30;
-    $fp = @stream_socket_client('tcp://' . $host . ':' . $port, $errno, $errstr, $timeout);
+    $encryption = strtoupper((string) ($config['smtp_encryption'] ?? 'STARTTLS'));
+    $isSsl = ($encryption === 'SSL' || $encryption === 'SMTPS');
+    $transport = $isSsl ? 'ssl' : 'tcp';
+    $fp = @stream_socket_client($transport . '://' . $host . ':' . $port, $errno, $errstr, $timeout);
     if ($fp === false) {
         error_log('PDU mailer: cannot connect to ' . $host . ':' . $port . ' (' . $errstr . ')');
         return false;
@@ -77,8 +80,7 @@ function pduSendMail(string $to, string $subject, string $body, array $additiona
     $ehlo = smtpReadResponse($fp);
     $capabilities = implode("\n", $ehlo);
 
-    $encryption = strtoupper((string) ($config['smtp_encryption'] ?? 'STARTTLS'));
-    if (($encryption === 'STARTTLS' || $encryption === 'TLS' || $encryption === 'AUTO') && stripos($capabilities, 'STARTTLS') !== false) {
+    if (!$isSsl && ($encryption === 'STARTTLS' || $encryption === 'TLS' || $encryption === 'AUTO') && stripos($capabilities, 'STARTTLS') !== false) {
         smtpWrite($fp, 'STARTTLS');
         $response = smtpReadResponse($fp);
         if (substr($response[0] ?? '', 0, 3) !== '220') {
